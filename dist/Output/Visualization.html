@@ -1,0 +1,380 @@
+﻿<!DOCTYPE html>
+
+<html>
+<head>
+    <title>1990 - 2011 Population Estimates Visualization</title>
+    <link href="Scripts/c3.min.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="Scripts/jquery-1.11.3.min.js"></script>
+    <script type="text/javascript" src="Scripts/d3.v3.min.js"></script>
+    <script type="text/javascript" src="Scripts/c3.min.js"></script>
+    <script type="text/javascript" src="https://www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1.1','packages':['geochart']}]}"></script>
+    <!-- js imports that hold the population data JSON objects  -->
+    <script type="text/javascript" src="AllStatedata.js"></script>
+    <script type="text/javascript" src="ComputedStateData.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            // Arrays/Objects used through out code, mostly for indexing JSON objects 
+            var yearArray = [1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2002, 2004, 2005, 2006, 2007, 2008, 2009, 2011];
+            var raceVisualObj = {
+                "visual":
+                    {
+                        "t": "Total",
+                        "w": "White",
+                        "b": "Black",
+                        "na": "Native American",
+                        "ap": "Asian/Pacific",
+                        "m": "Mixed",
+                        "h": "Hispanic",
+                        "hw": "Hispanic-White",
+                        "hnw": "Hispanic-NonWhite"
+                    }
+            };
+            var stateArray = ["United States", "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "District Of Columbia", "Florida", "Georgia", "Hawaii",
+                                "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi",
+                                "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma",
+                                "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia",
+                                "Wisconsin", "Wyoming"];
+            // Data references from imported json objects, see line 11 & 12
+            var allStateData = allDataFromFile;
+            var computedData = computedDataFromFile;
+
+    // -- Code For Charts -- //
+
+            // Initialize chart controls 
+            $("#controls").html(renderControls(raceVisualObj, stateArray));
+
+            // Initialize chart and set defualt data
+            var chartXArray = ['x', 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2002, 2004, 2005, 2006, 2007, 2008, 2009, 2011];
+            var chart = c3.generate({
+                bindto: '#chart',
+                data: {
+                    x:"x",
+                    columns:getChartData(allStateData, yearArray, getStateArray(), getRaceArray())
+                },
+                axis: {
+                    x: {
+                        label:"State-Racial Group",
+                        tick: {
+                            fit: false
+                        }
+                    },
+                    y: {
+                        label:"Population Est.",
+                        tick: {
+                            format: d3.format(",")
+                        }
+                    }
+                },
+                grid: {
+                    x: {
+                        show: true
+                    },
+                    y: {
+                        show: true
+                    }
+                },
+                tooltip: {
+                    format: {
+                        title: function (d) { return 'Year- ' + d; },
+                        value: function (value, ratio, id) {
+                            var format = d3.format(',');
+                            return format(value);
+                        }
+                    }
+                }
+            });
+
+            // Control event handler that swap in and out race data
+            $("#controls").on("click", ".AllDataRaceCheckBoxes", function () {
+                if (!$(this).is(":checked")) {
+                    var shownData = chart.data.shown();
+
+                    var arrayToRemove = new Array();
+                    for (var data in shownData) {
+                        var id = shownData[data].id;
+                        if ($.trim(id.substring(id.lastIndexOf("-") + 1, id.length)) == $.trim($(this).data("chartid"))) {
+                            arrayToRemove.push(shownData[data].id);
+                        }
+                    }
+
+                    chart.unload({
+                        ids: arrayToRemove
+                    });
+                }
+                else {
+                    chart.load({
+                        columns:
+                          getChartData(allStateData, yearArray, getStateArray(), getRaceArray())
+                    });
+                }
+            });
+
+            // Control event handler that swapp in and out states data
+            $("#controls").on("click", ".AllDataStateCheckBoxes", function () {
+                if (!$(this).is(":checked")) {
+                    var shownData = chart.data.shown();
+
+                    var arrayToRemove = new Array();
+                    for (var data in shownData) {
+                        var id = shownData[data].id;
+                        if (id.substring(0, id.lastIndexOf("-")) == $(this).val()) {
+                            arrayToRemove.push(shownData[data].id);
+                        }
+                    }
+
+                    chart.unload({
+                        ids: arrayToRemove
+                    });
+                }
+                else {
+                    chart.load({
+                        columns:
+                          getChartData(allStateData, yearArray, getStateArray(), getRaceArray())
+                    });
+                }
+            });
+
+            // Contorl event handler that changes char type 
+            $("#controls").on("click", ".AllDataChartTypeCheckBoxDiv input[type=radio]", function () {
+                chart.transform($(this).val());
+            });
+
+            // Gets population data based on inputs, return is a multidimensional array specified by the chart
+            function getChartData(inCensusData, inYearArry, inStateOptions, inRaceOptions) {
+                var returnArry = new Array();
+                returnArry.push(chartXArray)
+                for (var state in inStateOptions) {
+                    for (var race in inRaceOptions) {
+                        var chartData = new Array();
+                        chartData.push(inStateOptions[state] + "-" + raceVisualObj.visual[inRaceOptions[race]]);
+                        for (var year in inYearArry) {
+                            chartData.push(inCensusData[inYearArry[year]][inStateOptions[state].toLowerCase()][inRaceOptions[race]])
+                        }
+                        returnArry.push(chartData);
+                    }
+                }
+                return returnArry;
+            }
+
+            // Return is html controls for manipulating charts
+            function renderControls(inRaceVisualObj, inStateArray) {
+                var htmlString = "<div class='AllDataCheckBoxesDiv AllDataChartTypeCheckBoxDiv'><div class='title'>Pick a Chart Type</div><table><tr><td><input name='charttype' checked type='radio' value='line'/></td><td>Line</td></tr>" +
+                                    "<tr><td><input name='charttype' type='radio' value='bar'/></td><td>Bar</td></tr>" +
+                                    "<tr><td><input name='charttype' type='radio' value='area'/></td><td>Area</td></tr></table></div><div class='divider'></div>";
+
+                htmlString += "<div class='AllDataCheckBoxesDiv AllDataRaceCheckBoxesDiv'><div class='title'>Pick a Racial Group</div><table>";
+                for (var race in inRaceVisualObj.visual) {
+                    htmlString += "<tr><td><input " + function () { if (race == "t") { return "checked" } }() + " class='AllDataRaceCheckBoxes' type='checkbox' data-chartid='" + inRaceVisualObj.visual[race] + "' value='" + race + "'/></td><td class='RaceCheckBoxTd'>" + inRaceVisualObj.visual[race] + "</td></tr>";
+                }
+                htmlString += "</table></div>";
+
+                htmlString += "<div class='divider'></div><div class='AllDataCheckBoxesDiv AllDataStatesCheckBoxesDiv'><div class='title'>Pick a State</div><table><tr>";
+                for (var state in inStateArray) {
+                    if (state % 5 == 1) {
+                        htmlString += "</tr><tr>"
+                    }
+                    htmlString += "<td class='StateCheckBoxTd'><input " + function () { if (state == 0) { return "checked" } }() + " class='AllDataStateCheckBoxes' type='checkbox' value='" + inStateArray[state] + "'/></td><td class='StateName'>" + inStateArray[state] + "</td>";
+                }
+                htmlString += "</tr></table></div>";
+
+                return htmlString;
+            }
+
+            // Returns an array representative of race options user selected
+            function getRaceArray() {
+                var returnArray = new Array();
+                $(".AllDataRaceCheckBoxes").each(function (index, value) {
+                    if ($(this).is(":checked")) {
+                        returnArray.push($(this).val());
+                    }
+                });
+                return returnArray;
+            }
+
+            // Returns an array representative of state options user selected
+            function getStateArray() {
+                var returnArray = new Array();
+                $(".AllDataStateCheckBoxes").each(function (index, value) {
+                    if ($(this).is(":checked")) {
+                        returnArray.push($(this).val());
+                    }
+                });
+                return returnArray;
+            }
+
+    // -- Code for Geo Charts -- //
+            
+            // Arrays used for user controls and accessign JSON object
+            var dataYearRangeArray = ["1990-1994", "1994-1999", "1999-2004", "2004-2009", "1990-1999", "1999-2009", "1990-2011"];
+            var chartType = ["Total Difference", "Percent Increase", "Growth Rate"];
+
+            // Initialize geo-charts 
+            var geoChartFivYear9094 = new google.visualization.GeoChart(document.getElementById('fiveYear_1990-1994'));
+            var geoChartFivYear9499 = new google.visualization.GeoChart(document.getElementById('fiveYear_1994-1999'));
+            var geoChartFivYear9904 = new google.visualization.GeoChart(document.getElementById('fiveYear_1999-2004'));
+            var geoChartFivYear0409 = new google.visualization.GeoChart(document.getElementById('fiveYear_2004-2009'));
+            var geoChartTenYear9099 = new google.visualization.GeoChart(document.getElementById('tenYear_1990-1999'));
+            var geoChartTenYear9909 = new google.visualization.GeoChart(document.getElementById('tenYear_1999-2009'));
+            var geoChartAllYears9011 = new google.visualization.GeoChart(document.getElementById('allYears_1990-2011'));
+
+            // Set geo-charts options
+            var options = {
+                region: 'US',
+                displayMode: 'regions',
+                resolution: 'provinces',
+                colorAxis: { colors: ['#ff0000', 'lightgrey', '#00cc00'] }
+            };
+
+            // Set geo-charts default data
+            geoChartFivYear9094.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1990-1994", "t", "total difference")), options);
+            geoChartFivYear9499.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1994-1999", "t", "total difference")), options);
+            geoChartFivYear9904.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1999-2004", "t", "total difference")), options);
+            geoChartFivYear0409.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "2004-2009", "t", "total difference")), options);
+            geoChartTenYear9099.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1990-1999", "t", "total difference")), options);
+            geoChartTenYear9909.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1999-2009", "t", "total difference")), options);
+            geoChartAllYears9011.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1990-2011", "t", "total difference")), options);
+
+            // Initialize geo-chart controls 
+            $("#geoChartControlHolder").html(renderGeoChartControls(raceVisualObj, chartType));
+
+            // Set controls event handlers
+            $("#geoChartControlHolder").on("click", ".geoChartRadioType", updateGeoCharts);
+
+            $("#geoChartControlHolder").on("click", ".geoChartRadioRace", updateGeoCharts);
+
+            // Gets population data based on inputs, return is a multidimensional array specified by the geo-chart
+            function getGeoChartData(inComputedData, inYearRange, inRaceOption, inDataSetType) {
+                var returnDataArray = new Array();
+                returnDataArray.push(new Array("State", inDataSetType));
+                for (var state in inComputedData[inYearRange]) {
+                    if (state != stateArray[0].toLowerCase()) {
+                        returnDataArray.push(new Array(state, inComputedData[inYearRange][state][inRaceOption][inDataSetType]));
+                    }
+                }
+                return returnDataArray;
+            }
+
+            // Return is html controls for manipulating geo-charts
+            function renderGeoChartControls(inRaceVisualObj, inChartType) {
+                var returnHtml = "<div class='geoChartControlsContainers'><div class='title'>Pick a Data Series</div><table class='geoChartRadioTypeTable'>";
+                for (type in inChartType) {
+                    returnHtml += "<tr><td><input type='radio' " + function () { if (type == 0) { return "checked='checked'" } }() + " name='geoChartRadioType' class='geoChartRadioType' value='" + inChartType[type] + "' /></td><td>" + inChartType[type] + " </td></tr>"
+                }
+                returnHtml += "</table></div>";
+
+                returnHtml += "<div class='divider'></div>";
+
+                returnHtml += "<div class='geoChartControlsContainers'><div class='title'>Pick a Racial Group</div><table class='geoChartRadioRaceTable'>";
+                for (race in inRaceVisualObj.visual) {
+                    returnHtml += "<tr><td><input type='radio' " + function () { if (race == "t") { return " checked='checked' " } }() + " name='geoChartRadioRace' class='geoChartRadioRace' value='" + race + "' /></td><td>" + inRaceVisualObj.visual[race] + " </td></tr>"
+                }
+                returnHtml += "</table></div>";
+
+                return returnHtml;
+            }
+
+            //Function called by event handlers that update geo-charts data
+            function updateGeoCharts() {
+                var typeRadioValue = $("input[name=geoChartRadioType]:checked").val().toLowerCase();
+                var raceRadioValue = $("input[name=geoChartRadioRace]:checked").val().toLowerCase();
+
+                geoChartFivYear9094.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1990-1994", raceRadioValue, typeRadioValue)), options);
+                geoChartFivYear9499.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1994-1999", raceRadioValue, typeRadioValue)), options);
+                geoChartFivYear9904.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1999-2004", raceRadioValue, typeRadioValue)), options);
+                geoChartFivYear0409.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "2004-2009", raceRadioValue, typeRadioValue)), options);
+                geoChartTenYear9099.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1990-1999", raceRadioValue, typeRadioValue)), options);
+                geoChartTenYear9909.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1999-2009", raceRadioValue, typeRadioValue)), options);
+                geoChartAllYears9011.draw(google.visualization.arrayToDataTable(getGeoChartData(computedData, "1990-2011", raceRadioValue, typeRadioValue)), options);
+            }
+
+        });
+    </script>
+    <style type="text/css">
+        * { font-family:Verdana, Geneva, Tahoma, sans-serif; font-size:12px; }
+        h2 { font-size:15px; }
+
+        #controls{ text-align:center }
+        #chart { width:90%; margin:0 auto; }
+        #chartTitle { width:80%; margin:0 auto; padding:0;}
+        #separator { width:90%; height:5px; background-color:#E8E8E8; margin:0 auto;}
+        #geoChartsHolder { width:80%; margin:0 auto;text-align:center; display:inline-block;}
+        #geoChartControlHolder { display:inline-block; height:400px; vertical-align:top; }
+
+        .divider { width:10px; display:inline-block }
+
+        .AllDataCheckBoxesDiv { display:inline-block; border-radius: 30px/10px; padding:15px; background: #E8E8E8; vertical-align:top}
+        .AllDataRaceCheckBoxesDiv table { border-collapse:collapse; border-spacing:0; }
+        .AllDataRaceCheckBoxesDiv td { padding:1px 5px 1px 1px; white-space:nowrap}
+        .RaceCheckBoxTd { text-align:left }
+
+        .AllDataStatesCheckBoxesDiv table { border-collapse:collapse; border-spacing:0; }
+        .AllDataStatesCheckBoxesDiv table td { padding:2px 8px 2px 0; white-space:nowrap}
+        .StateName { text-align:left;}
+
+        .title { padding:3px; font-weight:bold; text-align:left }
+        .dateRangeTitle { width:100%; font-weight:bold; font-size:14px; border-bottom:3px solid #E8E8E8; padding-top:15px; padding-bottom:5px; }
+        .borderRight { border-right:1px solid #E8E8E8 }
+        .borderBottom { border-bottom:1px solid #E8E8E8 }
+
+        .geoChartContainers { width:48%; display:inline-block;padding-bottom:15px; padding-right:1px; }
+        .geoChartContainersDivs { height:400px; }
+        .geoChartRadioTypeTable { border-collapse:collapse; border-spacing:0 }
+        .geoChartRadioTypeTable td { padding-right:10px; }
+        .geoChartControlsContainers {  border-radius: 30px/10px; padding:15px; background: #E8E8E8;}
+
+
+    </style>
+</head>
+<body>
+    <div id="chartTitle"><h2>Estimated Population Data &nbsp;<small>1990 - 2011</small></h2></div>
+    <div id="chart"></div>
+    <div id="controls"></div>
+    <br/>
+    <div id="separator"></div>
+    <br/>
+    <div id="geoChartControlHolder"></div>
+    <div id="geoChartsHolder">
+        <div class="dateRangeTitle">5 Year Grouping</div>
+        <div class="geoChartContainers borderRight borderBottom">
+            <div class="title">Population Stats: 1990-1994</div>
+            <div class="geoChartControls"></div>
+            <div class="geoChartContainersDivs" id="fiveYear_1990-1994"></div>
+        </div>
+        <div class="geoChartContainers borderBottom">
+            <div class="title">Population Stats: 1994-1999</div>
+            <div class="geoChartControls"></div>
+            <div class="geoChartContainersDivs" id="fiveYear_1994-1999"></div>
+        </div>
+        <br/>
+        <div class="geoChartContainers borderRight borderBottom">
+            <div class="title">Population Stats: 1999-2004</div>
+            <div class="geoChartControls"></div>
+            <div class="geoChartContainersDivs" id="fiveYear_1999-2004"></div>
+        </div>
+        <div class="geoChartContainers borderBottom">
+            <div class="title">Population Stats: 2004-2009</div>
+            <div class="geoChartControls"></div>
+            <div class="geoChartContainersDivs" id="fiveYear_2004-2009"></div>
+        </div>
+        <br/>
+        <div class="dateRangeTitle">10 Years Grouping</div>
+        <div class="geoChartContainers borderRight borderBottom">
+            <div class="title">Population Stats: 1990-1999</div>
+            <div class="geoChartControls"></div>
+            <div class="geoChartContainersDivs" id="tenYear_1990-1999"></div>
+        </div>
+        <div class="geoChartContainers borderBottom">
+            <div class="title">Population Stats: 1999-2009</div>
+            <div class="geoChartControls"></div>
+            <div class="geoChartContainersDivs" id="tenYear_1999-2009"></div>
+        </div>
+        <br />
+        <div class="dateRangeTitle">All Years Grouping</div>
+        <div class="geoChartContainers borderBottom">
+            <div class="title">Population Stats: 1990-2011</div>
+            <div class="geoChartControls"></div>
+            <div class="geoChartContainersDivs" id="allYears_1990-2011"></div>
+        </div>
+    </div>  
+</body>
+</html>
